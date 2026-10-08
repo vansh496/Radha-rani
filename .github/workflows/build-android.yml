@@ -1,0 +1,66 @@
+name: Build Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install build tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install aqtinstall
+          sudo apt-get update
+          sudo apt-get install -y ninja-build
+
+      - name: Install Qt
+        run: |
+          aqt install-qt linux desktop 6.8.3 linux_gcc_64 --modules qtdeclarative
+          aqt install-qt linux android 6.8.3 android_arm64_v8a --modules qtdeclarative qtquickcontrols2
+
+      - name: Install Android SDK
+        run: |
+          yes | sdkmanager --licenses || true
+          sdkmanager \
+            "platform-tools" \
+            "platforms;android-36" \
+            "build-tools;36.0.0" \
+            "ndk;27.2.12479018"
+
+      - name: Configure
+        run: |
+          ./6.8.3/android_arm64_v8a/bin/qt-cmake \
+            -DANDROID_SDK_ROOT="$ANDROID_HOME" \
+            -DANDROID_NDK_ROOT="$ANDROID_HOME/ndk/27.2.12479018" \
+            -S . \
+            -B build \
+            -GNinja
+
+      - name: Build APK
+        run: |
+          cmake --build build --target apk --parallel 2
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Shri-Chaurasi-Ji-APK
+          path: build/**/*.apk
